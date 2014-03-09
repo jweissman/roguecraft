@@ -1,0 +1,14 @@
+name: roguecraft
+summary: "TODO: Summary"
+description: "TODO: Description"
+license: MIT
+authors: Joseph Weissman
+email: jweissman1986@gmail.com
+homepage: https://rubygems.org/gems/roguecraft
+
+development_dependencies:
+  bundler: ~> 1.0
+  rake: ~> 0.8
+  rspec: ~> 2.4
+  rubygems-tasks: ~> 0.2
+  yard: ~> 0.8
