@@ -5,10 +5,16 @@ if File.directory?(File.join(root,'.git'))
   Dir.chdir(root) do
     begin
       require 'bundler/setup'
+      require 'libtcod'
+
+      require 'roguecraft'
+      require 'roguecraft/rogue_console'
+
+      RogueConsole.play!
     rescue LoadError => e
       warn e.message
       warn "Run `gem install bundler` to install Bundler"
-      exit -1
+      exit(-1)
     end
   end
 end
