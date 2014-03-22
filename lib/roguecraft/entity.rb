@@ -4,7 +4,7 @@ module Roguecraft
     attr_accessor :position
 
     def initialize(opts={})
-      @positions = opts[:position] || [0,0]
+      @position = opts[:position] || [0,0]
     end
 
     def move(direction)
@@ -12,8 +12,15 @@ module Roguecraft
       @position = translate(@position, direction) # zip(DIRECTIONS[direction]).map { |a,b| a + b }
     end
 
-    def x; @position[0] end
-    def y; @position[1] end
+    # def x; @position[0] end
+    # def y; @position[1] end
+    def position
+      @position ||= [0,0]
+    end
 
+    def x; position[0] end
+    def y; position[1] end
+    def x=(_x); position[0] = _x end
+    def y=(_y); position[1] = _y end
   end
 end

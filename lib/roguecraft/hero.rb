@@ -3,7 +3,8 @@ module Roguecraft
     attr_reader :hp, :str, :con, :dex, :wis
     # attr_accessor :position
 
-    def initialize
+    def initialize(opts={})
+      super(opts)
       @hp = 30
       @str = @con = @dex = @wis = 10
     end
@@ -15,7 +16,13 @@ module Roguecraft
     #   @position = @position.zip(DIRECTIONS[direction]).map { |a,b| a + b }
     # end
 
-    # def x; @position[0] end
-    # def y; @position[1] end
+    # def position
+    #   @position ||= [0,0]
+    # end
+
+    # def x; position[0] end
+    # def y; position[1] end
+    # def x=(_x); position[0] = x end
+    # def y=(_y); position[1] = y end
   end
 end
