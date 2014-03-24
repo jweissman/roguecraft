@@ -16,6 +16,8 @@ TODO: Description
 
 ## Requirements
 
+    libtcod
+
 ## Install
 
     $ gem install roguecraft
