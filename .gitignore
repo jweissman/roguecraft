@@ -3,3 +3,5 @@ doc/
 pkg/
 vendor/cache/*.gem
 tags
+.DS_Store
+.bundle
