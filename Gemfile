@@ -5,6 +5,7 @@ gem 'libtcod'
 gem 'sinatra'
 gem 'sinatra-websocket'
 gem 'eventmachine'
+gem 'websocket-eventmachine-client'
 gem 'thin'
 
 gemspec
