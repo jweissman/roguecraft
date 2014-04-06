@@ -1,108 +1,80 @@
 module Roguecraft
   class Game
-    include Navigation
+    # include Navigation
     include Minotaur
     include Minotaur::Geometry
     include Minotaur::Geometry::Directions
     include Minotaur::Support::DirectionHelpers
     include Minotaur::Support::PositionHelpers
 
-    DEFAULT_HEIGHT          = 40
-    DEFAULT_WIDTH 	    = 40
-    DEFAULT_ROOMS_PER_LEVEL = 4
-    DEFAULT_DEPTH 	    = 3
+    # we're going to try to use TCOD's illumination algo server side...
+    include TCOD
 
-    DEFAULT_VISION_RADIUS   = 4
+    DEFAULT_HEIGHT          = (ENV['GAME_HEIGHT'] || 40).to_i
+    DEFAULT_WIDTH 	    = 60
+    DEFAULT_ROOMS_PER_LEVEL = 35
+    DEFAULT_DEPTH 	    = (ENV['GAME_DEPTH'] || 10).to_i
+    DEFAULT_VISION_RADIUS   = 8
 
     attr_reader :dungeon, :depth, :current_depth, :current_level, :heroes, :height, :width
-    attr_reader :gold, :next_moves
-
+    attr_accessor :gold, :potions, :next_moves, :scheduled_removals
     attr_accessor :entities
     
     def initialize(opts={})
+      Roguecraft.logo
+      puts " > Creating new game..."
+
       @height        = opts[:height]  || DEFAULT_HEIGHT
       @width         = opts[:width]   || DEFAULT_WIDTH
       @depth         = opts[:depth]   || DEFAULT_DEPTH
     
       rooms_per_level = opts[:rooms_per_level] || DEFAULT_ROOMS_PER_LEVEL
 
-      # @hero          = opts[:hero]          || Hero.new
       @heroes = []
 
-      @vision_radius = opts[:vision_radius] || DEFAULT_VISION_RADIUS
       @dungeon       = opts[:dungeon]       || Dungeon.new(width: @width, height: @height, depth: @depth, room_count: rooms_per_level)
 
-      # @current_depth = 0
-      
-       
-      # @accessible = Array.new(@depth) { Array.new(@height) { Array.new(@width) { @dungeon.levels[
-      # @explored   = [] # Array.new {Array.new(@depth) { Array.new(@height) { Array.new(@width) { false }}}}
-      # @unexplored = [] # Array.new { Array.new(@depth) { Array.new(@height) { Array.new(@width) { true }}}}
-       
-      # clone entities... we'll need to remove them, move them around, etc.
       @entities = @dungeon.entities.dup
-      @maps = [] #Array.new(@depth) {[]}
+      @maps = []
       @next_moves = {}
+      @scheduled_removals = []
+    end
+
+    def find_hero(uuid)
+      @heroes.detect {|h| h.uuid == uuid }
     end
 
     def add_hero
-      hero = Hero.new(self) #, position: find_type(0))
-      # hero.position = find_type(0)
+      # puts "--- ADD HERO"
+      position = find_type(0,0) # on level 0 with type 0/open :( 
+      hero = Hero.new(self, position: position, name: @dungeon.pc_name, vision_radius: DEFAULT_VISION_RADIUS)
       @heroes << hero
+      puts "--- welcome #{hero.name} (#{hero.uuid})"
       
-      hero_id = @heroes.index(hero)
-
-      # @explored[hero_id] = Array.new(@depth) { Array.new(@height) { Array.new(@width) { false }}}
-      # @unexplored[hero_id] = Array.new(@depth) { Array.new(@height) { Array.new(@width) { true }}}
-
-      hero_id
+      hero.uuid
     end
 
 
     def map_for_level(level=0)
-      # binding.pry # unless level
       @maps[level] ||= @dungeon.levels[level].to_a
-      # @dungeon.levels[@heroes[hero_id].current_depth]
     end
 
-
-    # def explore!(hero_id,x,y)
-    #   @explored[hero_id][@current_depth][y][x] = true
-    # end
-
-    # def explored?(hero_id,x,y)
-    #   @explored[hero_id][@current_depth][y][x]
-    # end
-
-    # def unexplored
-    #   unexplored = []
-    #   @explored[@current_depth].each_with_index do |row, y|
-    #     row.each_with_index do |is_explored, x|
-    #       position = Minotaur::Geometry::Position.new(x,y)
-    #       unexplored << [x,y] if !is_explored && current_level.accessible?(position)
-    #     end
-    #   end
-    #   unexplored
-    # end
-
+    
     def find_type(level,type)
       rows, columns = [], []
       x,y = nil,nil
       map_for_level(level).each_with_index do |row,_y|
 	if row.any? { |tile| tile == type }
 	  rows << _y
-	  # y = _y
-	  # break
 	end
       end
 
       y = rows.sample
+      return false unless y 
 
       map_for_level(level)[y].each_with_index do |tile,_x| 
 	if tile == type
-	  # x = _x
 	  columns << _x
-	  # break
 	end
       end
 
@@ -111,65 +83,13 @@ module Roguecraft
       return false unless x && y
 
       Position.new(x,y)
-    rescue
-      binding.pry
+    #rescue
+    #  binding.pry
     end
 
-    def hero(id)
-      @heroes[hero_id]
-    end
-
-    def current_level(hero_id)
-      @dungeon.levels[hero(hero_id).current_depth]
-      # @dungeon.levels[@current_depth]
-    end
-
-    def current_room(hero_id)
-      current_level(hero_id).rooms.detect do |room|
-	room.contains?(hero(hero_id).position) # _position(hero_id))
-      end
-    end
-
-    # def adjacent_rooms
-    #   current_room.adjacent_rooms
-    # end
-
-    def unexplored_rooms(hero_id)
-      current_level.rooms.select do |room|
-	room.all_positions.any? { |pos| !explored?(pos.x,pos.y) } #unexplored.include?([pos.x, pos.y]) }
-      end
-    end
-
-    def find_nearest_unexplored_room(hero_id,source) #=current_room)
-      puts "find nearest unexplored..."
-      @tested_for_unexplored ||= []
-      @tested_for_unexplored << source
-
-      unexplored_adjacent = source.adjacent_rooms.detect { |room| unexplored_rooms(hero_id).include?(room) }
-      if unexplored_adjacent
-	return unexplored_adjacent
-      else
-	source.adjacent_rooms.each do |room|
-	  unless @tested_for_unexplored.include?(room)
-	    unexplored_room = find_nearest_unexplored_room(hero_id,room)
-	    if unexplored_room
-	      return unexplored_room
-	    end
-	  end
-	end
-      end
-
-      nil
-    end
-
-    # def map
-    #   @map ||= current_level.to_a
-    # end
 
     def at(level,x,y)
       map_for_level(level)[y][x]
-    rescue
-      binding.pry
     end
 
     def entity_at(depth,x,y)
@@ -190,173 +110,176 @@ module Roguecraft
     def gold?(depth,x,y)
       entity_at?(depth,x,y) && entity_at(depth,x,y).type == :gold
     end
-    
+
+    def gold(depth)
+      @entities[depth].select { |e| e.type == :gold }
+    end
+
+    def potion?(depth,x,y)
+      entity_at?(depth,x,y) && entity_at(depth,x,y).type == :potion
+    end
+
+    def potions(depth)
+      @entities[depth].select { |e| e.type == :potion }
+    end
+
+    def scroll?(depth,x,y)
+      entity_at?(depth,x,y) && entity_at(depth,x,y).type == :scroll
+    end
+
+    def scrolls(depth)
+      @entities[depth].select { |e| e.type == :scroll }
+    end
+
+    def treasure?(depth,x,y)
+      potion?(depth,x,y) || gold?(depth,x,y) || scroll?(depth,x,y)
+    end
+      # entity_at(depth,x,y)
+
     def block_visible?(depth,x,y)
-      !floor?(depth,x,y) # wall?(x,y) || door?(x,y) || stairs?(x,y)
+      !floor?(depth,x,y) || treasure?(depth,x,y)
     end
 
     def next_move(entity,direction)
-      puts "--- setting next moves!"
-      #@next_moves ||= {}
-      #binding.pry
       @next_moves[entity] = direction
     end
-    
-    def step!
-      # apply next moves
-      # puts "==== STEP!"
-      # p @next_moves
-      # binding.pry
-      @next_moves.each do |entity, direction|
-	puts ">>>> PROCESSING NEXT MOVE!!"
-	move(entity, direction)
-      end
-      @next_moves = {}
+
+    def remove(entity)
+      @scheduled_removals << entity
     end
 
     # invoke move on entity unless blocked by map
     def move(entity, direction)
       entity.move(direction) if entity
-      # moved = false
-      # target = entity.position.translate(direction)
-      # depth = entity.current_depth
-      # 
-      # # if stairs?(depth,x,y)
-      # #   if entity.is_a?(Hero) && up?(depth,x,y) # == @hero && up?(x,y)
-      # #     hero.ascend! 
-      # #   elsif entity.is_a?(Hero) && down?(depth,x,y) # == @hero && down?(x,y)
-      # #     hero.descend! 
-      # #   end
-      # #   moved = true
-      # # end
-
-      # # if entity_at?(depth,x,y)
-      # #   if entity_at(depth,x,y).type == :gold
-      # #     # collect gold!
-      # #     # gold ||= 0
-      # #     entity.gold = entity.gold + entity_at(x,y).amount
-      # #     @entities[depth] -= [entity_at(x,y)]
-      # #   end
-      # # end
-
-      # unless moved || wall?(depth,target.x,target.y)
-      #   entity.move(direction)
-      #   moved = true
-      # end
-
-      # moved
     end
 
     def hero_position(hero_id)
       hero(hero_id).position
-      # Minotaur::Geometry::Position.new(@heroes[hero_id].x, @heroes[hero_id].y)
     end
-
-    # def path(hero_id,target)
-    #   current_level(hero_id).path(hero_position(hero_id), target) # @heroes[hero_id].position, target)
-    # end
 
     def down_stairs_position(level)
       stairs = find_type(level, 4)
       if stairs
-	# Position.new(stairs[0], stairs[1])
 	stairs
       else
 	nil
       end
     end
 
-    # TODO fix this madness! (unify around directions, tile maps)
-    # def automove(hero_id,target) #=down_stairs_position)
-    #   @automove_path  ||= []
-    #   @automove_index ||= 0
+    attr_accessor :sockets
 
-    #   unless @automove_path.include?(hero_position(hero_id)) && @automove_path.last == target
-    #     @automove_path = path_to(target)
-    #   end
-    #   
-    #   @automove_index = @automove_path.index(hero_position)
+    def sockets
+      @sockets ||= {}
+    end
 
-    #   if @automove_index < @automove_path.size-1
-    #     next_direction = direction_from(@automove_path[@automove_index], @automove_path[@automove_index+1])
-    #     move(@hero, compass_to_direction(next_direction))
-    #   else
-    #     puts "--- !!!! guess we couldn't find a path"
-    #     binding.pry
-    #   end
-    # end
+    def transmit(type, message={}, target)
+      message[:type] = type
+      payload = message.to_json
+      # puts "==== SEND MESSAGE (type #{type}, length #{payload.size})"
+      target.send(payload)
+    end
 
-    # def unexplored_areas_in_current_room
-    #   (current_room.all_positions + current_room.outer_perimeter + current_room.outer_corners).select { |p| !explored?(p.x, p.y) }
-    # end
+    # kick core websocket gameplay loop
+    def react!
+      EM.next_tick do 
+	EM.add_periodic_timer(0.01) do
+	  # @last_tick ||= 0
+	  # puts "==== tick! last one was #{Time.now - @last_tick} ago"
+	  # @last_tick = Time.now
 
-    # def current_room_has_unexplored_areas?
-    #   !unexplored_areas_in_current_room.empty?
-    # end
+	  moves = @next_moves
+	  removals = @scheduled_removals.dup
 
-    # def current_level_has_visible_gold?
-    #   @entities[@current_depth].any? do |entity|
-    #     entity.type == :gold && explored?(entity.location.x, entity.location.y)
-    #   end
-    # end
+	  removals.each do |entity|
+	    entity_group = @entities.detect { |es| es.include?(entity) }
 
-    # follow a space-filling curve..?
-    # def autoexplore
-    #   puts "--- autoexploring"
-    #   @autoexplore_target ||= nil
-    #   if !@autoexplore_target || @autoexplore_target == hero_position # || (current_room && explored?(@autoexplore_target.x, @autoexplore_target.y))
-    #     puts "--- re-evaluating autoexplore target"
+	    if entity_group
+	      sockets.values.each do |s|
+		data = {id: entity_group.index(entity), depth: @entities.index(entity_group)}
+		transmit 'removal', data, s
+	      end
+	    end
 
-    #     if current_level_has_visible_gold?
-    #       # SEEK THE GOLD
+	    puts ">>>> DELETING ENTITY"
+	    entity_group.delete(entity) if entity_group
+	    @scheduled_removals.delete(entity)
+	  end
 
-    #       visible_gold = @entities[@current_depth].select do |entity|
-    #         entity.type == :gold && explored?(entity.location.x, entity.location.y)
-    #       end
+	  # step!
+	  @heroes.each { |h| h.update }
 
-    #       target_gold = visible_gold.min_by { |gp| distance_between(hero_position, gp.location) }
-    #       @autoexplore_target = target_gold.location
+	  @next_moves.each do |entity, direction|
+	    if move(entity, direction)
+	      # t0 = Time.now
+	      entity.recompute_fov if entity.is_a?(Hero)
+	      # puts "== recompute took #{Time.now-t0}"
+	    end
+	  end
+	  @next_moves = {}
 
-    #     elsif current_room_has_unexplored_areas?
-    #       puts "--- still has unexplored areas"
-    #       proposed_autoexplore_target = unexplored_areas_in_current_room.sample 
-    #       unless current_room.contains?(proposed_autoexplore_target) # @autoexplore_target
-    #         proposed_autoexplore_target = current_level.accessible_surrounding(proposed_autoexplore_target).select { |p| current_room.contains?(p) }.sample
-    #         binding.pry unless proposed_autoexplore_target
+	  moves.each do |entity, _|
+	    sockets.values.each do |s|
+	      if entity.is_a?(Roguecraft::Hero)
+		# puts "--- sending move message about #{entity.to_s}"
+		# puts "--- #{entity.x}, #{entity.y}"
+		message_data = entity.attributes.merge({
+		  visible:   entity.now_visible,
+		  invisible: entity.now_invisible
+		})
+		# s.send(message.to_json) 
+		transmit 'move', message_data, s
+	      end
+	    end
+	  end
+	end
+      end
+    end
 
-    #       end
+    def processed_uuids
+      @uuids_processed ||= []
+    end
 
-    #       @autoexplore_target = proposed_autoexplore_target
-    #     else
-    #       puts "--- no unexplored areas left in this room"
-    #       @tested_for_unexplored = []
-    #       nearest_unexplored_room = find_nearest_unexplored_room
-    #       if nearest_unexplored_room
-    #         @autoexplore_target = nearest_unexplored_room.center # unexplored_rooms.first.center
-    #       else
-    #         @autoexplore_target = down_stairs_position || nil
-    #       end
-    #     end
-    #   end
+    def handle_request(socket)
+      socket.onopen do
+	# EM.defer do
+	hero_id = add_hero
+	hero = find_hero(hero_id) 
+	hero.recompute_fov
+	# puts "--- init hero! explored? #{hero.explored}"
+	message_id = SecureRandom.uuid
+	socket.send({type: 'init', message_id: message_id}.merge(hero.attributes.merge({visible: hero.now_visible})).to_json)
+	sockets[hero_id] = socket
+	# end
+      end
 
-    #   automove(@autoexplore_target) if @autoexplore_target
-    # end
+      socket.onmessage do |msg|
+	data = JSON.parse(msg)
+	if processed_uuids.include?(data['message_id'])
+	  puts "--- already processed"
+	  return
+	end
+	processed_uuids << data['message_id'] if data['message_id']
 
-    # def descend!
-    #   @current_depth = @current_depth + 1
-    #   @map = current_level.to_a
-    #   @automove_path = []
-    #   stairs = find_type(3)
-    #   @hero.position     =  current_level.passable_adjacent_to(Position.new(stairs[0],stairs[1])).sample # stairs
-    #   @autoexplore_target = nil
-    # end
+	if data['type'] == 'move'
+	  hero_id = data['id']
+	  direction = direction_from_string(data['direction'])
+	  next_move(find_hero(hero_id), direction) 
+	elsif data['type'] == 'autopilot'
+	  puts "==== autoexplore #{data['on']}"
+	  hero_id = data['id']
+	  hero = find_hero(hero_id)
+	  hero.autoexplore(data['on'])
+	else
+	  raise "unknown message of type #{data['type']}"
+	end
+      end
 
-    # def ascend!
-    #   @current_depth = @current_depth - 1 
-    #   @map = current_level.to_a
-    #   @automove_path = []
-    #   stairs = find_type(4)
-    #   @hero.position  	   = current_level.passable_adjacent_to(Position.new(stairs[0],stairs[1])).sample
-    # end
+      socket.onclose do
+	warn("websocket closed")
+	hero_id = sockets.invert[socket]
+	heroes.delete_if { |h| h.uuid == hero_id } 
+	sockets.delete(hero_id)
+      end
+    end
   end
 end

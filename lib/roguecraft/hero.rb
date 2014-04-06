@@ -1,43 +1,98 @@
 module Roguecraft
+  
   class Hero < Entity
+    include TCOD
+    include Navigation
     include Minotaur::Support::DirectionHelpers
     include Minotaur::Support::PositionHelpers
-    attr_reader :name, :explored
+
+    attr_accessor :name, :explored, :visible
+    attr_reader :hp, :str, :con, :dex, :wis
+
     attr_accessor :gold
 
-    attr_reader :hp, :str, :con, :dex, :wis
-    # attr_accessor :position
-
     def initialize(game, opts={})
-      
+      puts "-- creating hero with opts #{opts.inspect}"
       @hp = 30
       @str = @con = @dex = @wis = 10
 
-      @current_depth = 0
+      @torch_radius = opts.delete(:vision_radius) { 3 }
+      @game = game
+      @explored = []
+      @visible  = []
 
-      @game = game # dungeon
-      @explored = Array.new(@game.depth) { Array.new(@game.height) { Array.new(@game.width) { false }}}
-      open_space = @game.find_type(@current_depth, 0) # find open floorspace...
-      # position = Position.new(open_space[0], open_space[1])
+      @maps = Array.new(@game.depth) {nil}
 
       @gold = 0
 
-      @name = @game.dungeon.pc_name # generate(:name)
-
-      super(opts.merge(position: open_space))
-      # @dungeon.heroes << self 
+      super(opts)
     end
 
-    def depth
-      @current_depth
+    def to_s
+      "The hero #@name"
+    end
+
+    def attributes
+      { :id => @uuid, :hp => @hp, :x => x, :y => y, :depth => depth, :gold => @gold } #, :visible => @visible, :explored => @explored }
     end
 
     def explore!(x,y)
-      @explored[depth][y][x] = true
+      @explored ||= []
+      @explored << [x,y]
+      @explored.uniq!
     end
 
     def explored?(x,y)
-      @explored[depth][y][x]
+      @explored ||= []
+      @explored.include?([x,y])
+    end
+
+    def view!(x,y)
+      explore!(x,y)
+
+      @visible ||= []
+      @visible << [x,y]
+      @visible.uniq!
+    end
+
+    def visible?(x,y)
+      @visible ||= []
+      @visible.include?([x,y])
+    end
+
+    def build_fov_map
+      puts "--- building hero fov map !!!!!"
+      @maps[depth] = map_new @game.width, @game.height
+      @game.map_for_level(depth).each_with_index do |row, y|
+	row.each_with_index do |tile, x|
+	  map_set_properties(@maps[depth], x, y, !@game.block_visible?(depth,x,y), !@game.wall?(depth,x,y))
+	end
+      end
+      @maps[depth]
+    end
+
+    attr_reader :now_visible, :now_invisible
+    def recompute_fov
+      # puts "--- recompute hero fov"
+      light_walls = true
+      fov_algo = 0 
+
+      @maps[depth] ||= build_fov_map
+      
+      map_compute_fov(@maps[depth], x, y, @torch_radius, light_walls, fov_algo)
+
+      old_visible = @visible
+      @visible = []
+      @game.dungeon.levels[depth].each_position do |pos|
+	view!(pos.x,pos.y) if map_is_in_fov(@maps[depth], pos.x, pos.y)
+	#   visible!(x,y) 
+	#   explore!(x,y) 
+	# end
+      end
+
+      # compute the delta
+      @now_visible   = @visible - old_visible
+      @now_invisible = old_visible - @visible # - @now_visible
     end
 
     def current_level
@@ -46,14 +101,6 @@ module Roguecraft
 
     def current_room
       current_level.rooms.detect { |room| room.contains?(@position) }
-    end
-
-    def explore!(x,y)
-      @explored[@current_depth][y][x] = true
-    end
-
-    def explored?(x,y)
-      @explored[@current_depth][y][x]
     end
 
     def unexplored_rooms
@@ -87,55 +134,56 @@ module Roguecraft
     end
 
     def move(direction)
-      puts "--- attempting to move hero #{humanize_direction(direction)}!!!"
-      # could move stair/gold collection here?
       moved = false
       target = @position.translate(direction)
       x,y = target.x, target.y
-      if @game.stairs?(@current_depth, x, y)
-	if @game.up?(@current_depth, x, y)
+      if @game.stairs?(depth, x, y)
+	if @game.up?(depth, x, y)
 	  ascend!
-	elsif @game.down?(@current_depth, x, y)
+	elsif @game.down?(depth, x, y)
 	  descend!
 	end
 	moved = true
       end
 
       if @game.entity_at?(@current_depth, x, y)
-	entity = @game.entity_at(@current_depth, x, y)
+	entity = @game.entity_at(depth, x, y) # @current_depth, x, y)
 	if entity.type == :gold
 	  @gold = @gold + entity.amount
-	  @game.entities[@current_depth] -= [entity]
+	  @game.remove(entity)
+	elsif entity.type == :potion || entity.type == :scroll
+	  puts ">>> WOULD BE TAKING POTION/SCROLL"
+	  @game.remove(entity)
+	  recompute_fov # why isn't this helping...? tempted to binding here and see if we're still eval'ing things right for this cell...
 	end
       end
 
-      unless moved || @game.wall?(@current_depth, x, y)
+      unless moved || @game.wall?(depth, x, y)
 	super(direction)
 	moved = true
       end
       
-      puts "moved? #{moved}"
+      # puts "moved? #{moved}"
 
-      # actually translate
-      # super(direction)
       moved
     end
 
     def descend!
+      @explored = []
       @current_depth = @current_depth + 1
       @automove_path = []
       stairs = @game.find_type(@current_depth, 3)
-      @position = current_level.passable_adjacent_to(stairs).sample # Position.new(stairs[0], stairs[1])).sample
+      @position = current_level.passable_adjacent_to(stairs).sample
       @autoexplore_target = nil
     end
 
     def ascend!
+      @explored = []
       @current_depth = @current_depth - 1
       @automove_path = []
       stairs = @game.find_type(@current_depth, 4)
       @position = current_level.passable_adjacent_to(Position.new(stairs[0], stairs[1])).sample
     end
-
 
     def path_to(target)
       current_level.path(@position, target)
@@ -153,7 +201,7 @@ module Roguecraft
 
       if @automove_index < @automove_path.size - 1
 	next_direction = direction_from(@automove_path[@automove_index], @automove_path[@automove_index+1])
-	move((next_direction))
+	@game.next_move(self,next_direction)
       else
 	puts "=== COULD NOT FIND A PATH!!!"
       end
@@ -167,35 +215,74 @@ module Roguecraft
       !unexplored_areas_in_current_room.empty?
     end
 
-    def current_level_has_visible_gold?
-      @game.entities[@current_depth].any? do |entity|
-	entity.type == :gold && explored?(entity.location.x, entity.location.y)
+    def visible_gold
+      @game.gold(depth).select do |entity|
+	explored?(entity.location.x, entity.location.y)
       end
     end
 
+    def visible_potions
+      @game.potions(depth).select { |e| explored?(e.location.x, e.location.y) }
+    end
+
+    def visible_scrolls
+      @game.scrolls(depth).select { |e| explored?(e.location.x, e.location.y) }
+    end
+
+    def visible_treasure
+      visible_gold + visible_potions + visible_scrolls
+    end
+
+    def current_level_has_visible_gold?
+      visible_gold.count > 0
+    end
+
+    def current_level_has_visible_potions?
+      visible_potions.count > 0
+    end
+
+    def current_level_has_visible_scrolls?
+      visible_scrolls.count > 0
+    end
+
+    def current_level_has_visible_treasure?
+      current_level_has_visible_gold? || current_level_has_visible_potions? || current_level_has_visible_scrolls?
+    end
+
+    def update
+      autoexplore if @autoexplore_active
+    end
+
     # follow a space-filling curve..?
-    def autoexplore
-      puts "--- autoexploring"
+    def autoexplore(on=true)
+      if !on
+	@autoexplore_active = false
+	return
+      end
+
+      # puts "--- autoexploring"
+      @autoexplore_active = true
       @autoexplore_target ||= nil
       if !@autoexplore_target || @autoexplore_target == @position # hero_position # || (current_room && explored?(@autoexplore_target.x, @autoexplore_target.y))
 	puts "--- re-evaluating autoexplore target"
 
-	if current_level_has_visible_gold?
+	if current_level_has_visible_treasure?
 	  # SEEK THE GOLD
 
-	  visible_gold = @game.entities[@current_depth].select do |entity|
-	    entity.type == :gold && explored?(entity.location.x, entity.location.y)
-	  end
+	  # visible_gold = @game.gold(depth).select do |gp| #entities[depth].select do |entity|
+	  #   # entity.type == :gold && 
+	  #   explored?(entity.location.x, entity.location.y)
+	  # end
 
-	  target_gold = visible_gold.min_by { |gp| distance_between(@position, gp.location) }
-	  @autoexplore_target = target_gold.location
+	  target_treasure = visible_treasure.min_by { |gp| distance_between(@position, gp.location) }
+	  @autoexplore_target = target_treasure.location
 
         elsif current_room_has_unexplored_areas?
 	  puts "--- still has unexplored areas"
           proposed_autoexplore_target = unexplored_areas_in_current_room.sample 
 	  unless current_room.contains?(proposed_autoexplore_target) # @autoexplore_target
 	    proposed_autoexplore_target = current_level.accessible_surrounding(proposed_autoexplore_target).select { |p| current_room.contains?(p) }.sample
-	    binding.pry unless proposed_autoexplore_target
+	    # binding.pry unless proposed_autoexplore_target
 
 	  end
 

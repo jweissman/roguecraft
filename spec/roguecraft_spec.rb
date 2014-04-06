@@ -20,7 +20,11 @@ describe Roguecraft::Hero do
     its(:con) { 10 }
     its(:dex) { 10 }
     its(:wis) { 10 }
+
+    # its(:attack_dice)     { D3 }
+    # its(:attack_modifier) { 0  }
   end
+  pending 'navigation'
 end
 
 describe Roguecraft::Game do
