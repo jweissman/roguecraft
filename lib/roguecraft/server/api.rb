@@ -23,7 +23,7 @@ class Roguecraft::API < Sinatra::Base
 
   get '/:level/tiles.json' do
     puts "=== GET /[level]/tiles.json"
-    puts "--- #{params.inspect}"
+    # puts "--- #{params.inspect}"
     {data: generate_tiles(settings.game, level), width: settings.game.width, height: settings.game.height}.to_json
   end
 

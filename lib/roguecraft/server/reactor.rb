@@ -2,8 +2,6 @@ include Roguecraft::HeroesHelper
 include Roguecraft::TilesHelper
 
 def run(opts)
-
-  # Start the reactor
   EM.run do
     # define some defaults for our app
     server  = opts[:server] || 'thin'
@@ -32,21 +30,15 @@ def run(opts)
       Port:   port
     })
 
-    # web_app.step!
     game = web_app.settings.game
-    # sockets = web_app.settings.sockets
-
-    game.react! #(sockets)
-    # puts "--- starting roguecraft game on server!"
-    #$game = Roguecraft::Game.new
-    # puts "--- done!"
+    game.react!
 
     Signal.trap("INT")  { EventMachine.stop }
     Signal.trap("TERM") { EventMachine.stop }
+    Signal.trap("USR1") { game.debug }
   end
 end
 
-# start the application
-# = Roguecraft::API.new
-run app: Roguecraft::API.new
 
+# kick it!
+run app: Roguecraft::API.new

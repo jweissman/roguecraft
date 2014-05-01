@@ -24,7 +24,8 @@ describe Roguecraft::Hero do
     # its(:attack_dice)     { D3 }
     # its(:attack_modifier) { 0  }
   end
-  pending 'navigation'
+
+  pending 'navigation' # move to something more primitive?
 end
 
 describe Roguecraft::Game do

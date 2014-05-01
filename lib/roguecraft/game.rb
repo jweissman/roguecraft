@@ -10,19 +10,19 @@ module Roguecraft
     # we're going to try to use TCOD's illumination algo server side...
     include TCOD
 
-    DEFAULT_HEIGHT          = (ENV['GAME_HEIGHT'] || 40).to_i
-    DEFAULT_WIDTH 	    = 60
-    DEFAULT_ROOMS_PER_LEVEL = 35
-    DEFAULT_DEPTH 	    = (ENV['GAME_DEPTH'] || 10).to_i
-    DEFAULT_VISION_RADIUS   = 8
+    DEFAULT_HEIGHT          = (ENV['GAME_HEIGHT'] || 20).to_i
+    DEFAULT_WIDTH 	    = 20
+    DEFAULT_ROOMS_PER_LEVEL = 15
+    DEFAULT_DEPTH 	    = (ENV['GAME_DEPTH'] || 5).to_i
+    DEFAULT_VISION_RADIUS   = 4
 
     attr_reader :dungeon, :depth, :current_depth, :current_level, :heroes, :height, :width
     attr_accessor :gold, :potions, :next_moves, :scheduled_removals
     attr_accessor :entities
     
     def initialize(opts={})
-      Roguecraft.logo
-      puts " > Creating new game..."
+      # Roguecraft.logo
+      #puts " > Creating new game (#{Roguecraft.environment})..."
 
       @height        = opts[:height]  || DEFAULT_HEIGHT
       @width         = opts[:width]   || DEFAULT_WIDTH
@@ -46,7 +46,7 @@ module Roguecraft
 
     def add_hero
       # puts "--- ADD HERO"
-      position = find_type(0,0) # on level 0 with type 0/open :( 
+      position = find_type(0,0) # on level 0 with type 0/open
       hero = Hero.new(self, position: position, name: @dungeon.pc_name, vision_radius: DEFAULT_VISION_RADIUS)
       @heroes << hero
       puts "--- welcome #{hero.name} (#{hero.uuid})"
@@ -181,6 +181,7 @@ module Roguecraft
 
     # kick core websocket gameplay loop
     def react!
+      @started_at = Time.now
       EM.next_tick do 
 	EM.add_periodic_timer(0.01) do
 	  # @last_tick ||= 0
@@ -203,6 +204,8 @@ module Roguecraft
 	    puts ">>>> DELETING ENTITY"
 	    entity_group.delete(entity) if entity_group
 	    @scheduled_removals.delete(entity)
+	    # recompute all fovs?
+	    heroes.each { |h| h.build_fov_map }
 	  end
 
 	  # step!
@@ -280,6 +283,11 @@ module Roguecraft
 	heroes.delete_if { |h| h.uuid == hero_id } 
 	sockets.delete(hero_id)
       end
+    end
+
+    def debug
+      puts " > Current game uptime: #{Time.now - @started_at}"
+      puts " > Player count: #{heroes.count}" 
     end
   end
 end

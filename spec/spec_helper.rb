@@ -1,4 +1,5 @@
 require 'rspec'
-require 'roguecraft/version'
-
+require 'roguecraft'
 include Roguecraft
+puts ">>>> !!!"
+Roguecraft.environment = :test

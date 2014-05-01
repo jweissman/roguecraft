@@ -1,5 +1,6 @@
 require 'libtcod'
 require 'minotaur'
+require 'logger'
 
 require 'roguecraft/version'
 require 'roguecraft/navigation'
@@ -10,27 +11,50 @@ require 'roguecraft/hero'
 require 'roguecraft/game'
 
 module Roguecraft
-  def self.logo(small=false)
-    puts "========================================================="
-    if small 
-      puts "                                            __ _  " 
-      puts "        _ _ ___  __ _ _  _ ___ __ _ _ __ _ / _| |_" 
-      puts "       | '_/ _ \\/ _` | || / -_) _| '_/ _` |  _|  _|"
-      puts "       |_| \\___/\\__, |\\_,_\\___\\__|_| \\__,_|_|  \\__|"
-      puts "                |___/                             " 
-    else
-      puts "                                                   __ _   " 
-      puts "                                                  / _| |  " 
-      puts "        _ __ ___   __ _ _   _  ___  ___ _ __ __ _| |_| |_ " 
-      puts "       | '__/ _ \\ / _` | | | |/ _ \\/ __| '__/ _` |  _| __|"
-      puts "       | | | (_) | (_| | |_| |  __/ (__| | | (_| | | | |_ " 
-      puts "       |_|  \\___/ \\__, |\\__,_|\\___|\\___|_|  \\__,_|_|  \\__|"
-      puts "                   __/ |                                  " 
-      puts "                  |___/                                   " 
+  class << self
+    attr_writer :environment
+    def environment
+      @environment ||= :production
     end
-    puts "---------------------------------------------------------"
-    puts " > Roguecraft v#{Roguecraft::VERSION}"
-    puts "========================================================="
+
+    attr_accessor :stdout, :logfile
+    def setup_loggers
+      self.stdout = Logger.new(STDOUT)
+      self.logfile = Logger.new("log/#{self.environment}.log")
+    end
+
+    def log(msg)
+      setup_loggers unless self.stdout && self.logfile
+      self.stdout.info(msg) unless self.environment == :test
+      self.logfile.info(msg)
+    end
+  end
+
+  def log(msg)
+    Roguecraft.log(msg) 
+  end
+
+  def self.logo(small=false)
+    log "========================================================="
+    if small 
+      log "                                            __ _  " 
+      log "        _ _ ___  __ _ _  _ ___ __ _ _ __ _ / _| |_" 
+      log "       | '_/ _ \\/ _` | || / -_) _| '_/ _` |  _|  _|"
+      log "       |_| \\___/\\__, |\\_,_\\___\\__|_| \\__,_|_|  \\__|"
+      log "                |___/                             " 
+    else
+      log "                                                   __ _   " 
+      log "                                                  / _| |  " 
+      log "        _ __ ___   __ _ _   _  ___  ___ _ __ __ _| |_| |_ " 
+      log "       | '__/ _ \\ / _` | | | |/ _ \\/ __| '__/ _` |  _| __|"
+      log "       | | | (_) | (_| | |_| |  __/ (__| | | (_| | | | |_ " 
+      log "       |_|  \\___/ \\__, |\\__,_|\\___|\\___|_|  \\__,_|_|  \\__|"
+      log "                   __/ |                                  " 
+      log "                  |___/                                   " 
+    end
+    log "---------------------------------------------------------"
+    log " > Roguecraft v#{Roguecraft::VERSION}"
+    log "========================================================="
   end
 end
 

@@ -154,7 +154,6 @@ module Roguecraft
 	elsif entity.type == :potion || entity.type == :scroll
 	  puts ">>> WOULD BE TAKING POTION/SCROLL"
 	  @game.remove(entity)
-	  recompute_fov # why isn't this helping...? tempted to binding here and see if we're still eval'ing things right for this cell...
 	end
       end
 
