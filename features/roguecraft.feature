@@ -1,1 +1,1 @@
-Feature: Blah blah blah
+Feature: exploring a dungeon  As a player  I want to explore a dungeon  In order to attain glory  # Scenario: handling fog of war (?)  #   When I enter the dungeon  #    And I move around a bit  #   Then the fog of war should reflect that I've moved around

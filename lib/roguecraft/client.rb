@@ -314,8 +314,9 @@ module Roguecraft
 
 	if h.id == hero.id
 	  # puts "IT IS ME"
+	  puts "=== MESSAGE: hero_attributes.visible=#{hero_attributes.visible}"
 	  if old_depth != hero.depth
-	    # puts "I WENT DOWNSTAIRS LET US GET THE TILES AGAIN!"
+	    puts "!!! CHANGED LEVELS !!!"
 	    @tiles = get_tiles
 	    @entities = get_entities
 	    hero.explored = h.visible

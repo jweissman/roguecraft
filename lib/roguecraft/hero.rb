@@ -72,8 +72,8 @@ module Roguecraft
     end
 
     attr_reader :now_visible, :now_invisible
-    def recompute_fov
-      # puts "--- recompute hero fov"
+    def recompute_fov(changed_depths = false)
+      puts "--- recompute hero fov !!!!!!!!"
       light_walls = true
       fov_algo = 0 
 
@@ -91,7 +91,7 @@ module Roguecraft
       end
 
       # compute the delta
-      @now_visible   = @visible - old_visible
+      @now_visible   = changed_depths ? @visible : @visible - old_visible
       @now_invisible = old_visible - @visible # - @now_visible
     end
 
@@ -137,11 +137,14 @@ module Roguecraft
       moved = false
       target = @position.translate(direction)
       x,y = target.x, target.y
+      changed_depths = false
       if @game.stairs?(depth, x, y)
 	if @game.up?(depth, x, y)
 	  ascend!
+	  changed_depths = true
 	elsif @game.down?(depth, x, y)
 	  descend!
+	  changed_depths = true
 	end
 	moved = true
       end
@@ -159,8 +162,11 @@ module Roguecraft
 
       unless moved || @game.wall?(depth, x, y)
 	super(direction)
+	#@now_visible = @visible if changed_depths
 	moved = true
       end
+
+      recompute_fov(changed_depths) if moved
       
       # puts "moved? #{moved}"
 
@@ -168,6 +174,7 @@ module Roguecraft
     end
 
     def descend!
+      puts ">>>>> DESCEND"
       @explored = []
       @current_depth = @current_depth + 1
       @automove_path = []
@@ -177,6 +184,7 @@ module Roguecraft
     end
 
     def ascend!
+      puts ">>>>> ASCEND"
       @explored = []
       @current_depth = @current_depth - 1
       @automove_path = []
