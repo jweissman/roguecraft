@@ -10,6 +10,11 @@ class Roguecraft::API < Sinatra::Base
     set :game, Roguecraft::Game.new
   end
 
+  # get '/game.js' do
+  #   content_type "text/javascript"
+  #   coffee :roguecraft
+  # end
+
   get '/heroes.json' do
     settings.game.heroes.map do |hero|
       hero.attributes

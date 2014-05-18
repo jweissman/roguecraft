@@ -10,11 +10,11 @@ module Roguecraft
     # we're going to try to use TCOD's illumination algo server side...
     include TCOD
 
-    DEFAULT_HEIGHT          = (ENV['GAME_HEIGHT'] || 20).to_i
-    DEFAULT_WIDTH 	    = 20
-    DEFAULT_ROOMS_PER_LEVEL = 5
+    DEFAULT_HEIGHT          = (ENV['GAME_HEIGHT'] || 30).to_i
+    DEFAULT_WIDTH 	    = 50
+    DEFAULT_ROOMS_PER_LEVEL = 8
     DEFAULT_DEPTH 	    = (ENV['GAME_DEPTH'] || 5).to_i
-    DEFAULT_VISION_RADIUS   = 4
+    DEFAULT_VISION_RADIUS   = 6
 
     # reactor interval (in s)
     TICK_INTERVAL = 0.1
@@ -288,6 +288,11 @@ module Roguecraft
 	hero_id = sockets.invert[socket]
 	heroes.delete_if { |h| h.uuid == hero_id } 
 	sockets.delete(hero_id)
+
+	# let people know someone is gone...
+	sockets.values.each do |s|
+	  transmit 'bye', {id: hero_id}, s
+	end
       end
     end
 
