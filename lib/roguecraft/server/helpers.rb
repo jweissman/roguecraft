@@ -30,9 +30,14 @@ module Roguecraft
     def generate_entities(game, level)
       # puts "--- #{game.entities}"
       level = level.to_i if level.is_a?(String)
-      
-      game.entities[level].map do |e| #(&:to_h)
-	{ type: e.type, amount: e.amount, x: e.location.x, y: e.location.y } # color...? #, depth: e.current_depth }
+      entities = game.entities[level]
+      if entities
+	#game.entities[level]
+	entities.map do |e| #(&:to_h)
+	  { type: e.type, amount: e.amount, x: e.location.x, y: e.location.y } # color...? #, depth: e.current_depth }
+	end
+      else
+	[]
       end
     end
 
@@ -63,7 +68,16 @@ module Roguecraft
           visible: true,
           x: 0,
           y: 0
-        }],
+        }
+        # {
+	#   data: generate_entity_tiles(game,level).flatten,
+	#   height: game.height,
+	#   width: game.width,
+	#   name: 'entities',
+	#   opacity: 1,
+	#   type: 'tilelayer', #? 
+        # }
+      ],
 
 	tileheight: 32,
 	tilewidth: 32, 
