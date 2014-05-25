@@ -267,7 +267,7 @@ module Roguecraft
 	return
       end
 
-      # puts "--- autoexploring"
+      puts "--- autoexploring..."
       @autoexplore_active = true
       @autoexplore_target ||= nil
       if !@autoexplore_target || @autoexplore_target == @position # hero_position # || (current_room && explored?(@autoexplore_target.x, @autoexplore_target.y))
