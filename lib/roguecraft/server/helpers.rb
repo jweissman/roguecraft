@@ -20,6 +20,10 @@ module Roguecraft
 
   module TilesHelper
 
+    def tileset
+      @tileset ||= { :empty => 0, :wood => 1, :stone => 2, :door => 3, :up => 4, :down => 5, :gold => 6, :potion => 7, :scroll => 8 }
+    end
+
     # def generate_hero_list(game)
     #   game.heroes.map do |hero|
     #     hero_attributes(game, hero)	
@@ -49,9 +53,64 @@ module Roguecraft
       @tiles[level] ||= game.map_for_level(level).map { |r| r.map { |i| i+1 }}
     end
 
+    def generate_entity_tiles(game, level) 
+      level = level.to_i if level.is_a?(String)
+      entity_tiles ||= []
+
+      game.map_for_level(level).each_with_index do |row,y|
+	entity_tiles[y] = []
+	row.each_with_index do |_,x|
+	  entity = game.entity_at(level, x, y)
+	  entity_tiles[y][x] = tileset[entity.nil? ? :empty : :gold]
+	end
+      end
+
+      entity_tiles
+    end
+
+    def generate_object_list(level)
+      @object_list ||= []
+      @object_list[level] ||= game.entities[level].sort_by { |e| e.type }.map do |entity|	
+	{
+	  name: entity.type,
+	  properties: { entity_id: entity.guid, depth: level },
+
+	  type:       entity.type,
+	  gid:        tileset[entity.type],
+	  # entity_id:       entity.guid,
+	  visible:    false,
+	  width:      32,
+	  height:     32,
+	  x:          entity.location.x * 32,
+	  y:          entity.location.y * 32,
+	  z:          0
+	}
+      end
+
+      # puts "=== returning object list for level #{level}"
+      # puts JSON.pretty_generate(@object_list[level]) #.to_json
+
+      @object_list[level]
+    end
+
     def generate_phaser_tilemap(level)
-      tilesets = { :wood => 1, :stone => 2, :door => 3, :up => 4, :down => 5 }
       @tilemaps ||= {}
+      @entity_groups ||= []
+      @entity_groups[level] ||= nil 
+      if game.entities[level]
+        @entity_groups[level] = {
+	  objects: generate_object_list(level),
+	  height: game.height,
+	  width: game.width,
+	  name: 'entities',
+	  opacity: 1,
+	  type: 'objectgroup',
+	  visible: true,
+	  x: 0,
+	  y: 0
+        }
+      end
+
       @tilemaps[level] ||= {
         version: 1,
         height: game.height,
@@ -68,20 +127,11 @@ module Roguecraft
           visible: true,
           x: 0,
           y: 0
-        }
-        # {
-	#   data: generate_entity_tiles(game,level).flatten,
-	#   height: game.height,
-	#   width: game.width,
-	#   name: 'entities',
-	#   opacity: 1,
-	#   type: 'tilelayer', #? 
-        # }
-      ],
+        }, @entity_groups[level]].flatten,
 
 	tileheight: 32,
 	tilewidth: 32, 
-	tilesets: tilesets.map do |name, gid|
+	tilesets: tileset.map do |name, gid|
 	  {
 	    firstgid: gid,
 	    image: "assets/images/#{name}.png",

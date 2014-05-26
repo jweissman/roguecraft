@@ -14,7 +14,7 @@ module Roguecraft
     DEFAULT_WIDTH 	    = 50
     DEFAULT_ROOMS_PER_LEVEL = 8
     DEFAULT_DEPTH 	    = (ENV['GAME_DEPTH'] || 5).to_i
-    DEFAULT_VISION_RADIUS   = 6
+    DEFAULT_VISION_RADIUS   = 3
 
     # reactor interval (in s)
     TICK_INTERVAL = 0.1
@@ -24,9 +24,9 @@ module Roguecraft
     attr_accessor :entities
     
     def initialize(opts={})
-      # Roguecraft.logo
       #puts " > Creating new game (#{Roguecraft.environment})..."
 
+      # could just extend from a space?! :)
       @height        = opts[:height]  || DEFAULT_HEIGHT
       @width         = opts[:width]   || DEFAULT_WIDTH
       @depth         = opts[:depth]   || DEFAULT_DEPTH
@@ -38,6 +38,9 @@ module Roguecraft
       @dungeon       = opts[:dungeon]       || Dungeon.new(width: @width, height: @height, depth: @depth, room_count: rooms_per_level)
 
       @entities = @dungeon.entities.dup
+      # create a stamp
+      @entities.each { |lvl| lvl.each { |e| e.guid = SecureRandom.uuid }}
+
       @maps = []
       @next_moves = {}
       @scheduled_removals = []
@@ -140,7 +143,7 @@ module Roguecraft
       # entity_at(depth,x,y)
 
     def block_visible?(depth,x,y)
-      !(floor?(depth,x,y) || stairs?(depth,x,y)) || treasure?(depth,x,y)
+      !(floor?(depth,x,y) || stairs?(depth,x,y)) # || treasure?(depth,x,y)
     end
 
     def next_move(entity,direction)
@@ -199,7 +202,7 @@ module Roguecraft
 
 	    if entity_group
 	      sockets.values.each do |s|
-		data = {id: entity_group.index(entity), depth: @entities.index(entity_group)}
+		data = {depth: @entities.index(entity_group), entity_id: entity.guid }
 		transmit 'removal', data, s
 	      end
 	    end
